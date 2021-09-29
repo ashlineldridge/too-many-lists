@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(clippy::new_without_default)]
+
 pub struct List {
     head: Link,
 }
@@ -10,4 +13,10 @@ enum Link {
 struct Node {
     elem: i32,
     next: Link,
+}
+
+impl List {
+    pub fn new() -> Self {
+        List { head: Link::Empty }
+    }
 }

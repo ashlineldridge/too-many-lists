@@ -57,6 +57,16 @@ impl List {
     }
 }
 
+impl Drop for List {
+    // For explanation see https://rust-unofficial.github.io/too-many-lists/first-drop.html.
+    fn drop(&mut self) {
+        let mut cur_link = mem::replace(&mut self.head, Link::Empty);
+        while let Link::More(mut boxed_node) = cur_link {
+            cur_link = mem::replace(&mut boxed_node.next, Link::Empty);
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::List;

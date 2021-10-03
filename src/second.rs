@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 #![allow(clippy::new_without_default)]
+#![allow(clippy::should_implement_trait)]
 
 pub struct List<T> {
     head: Link<T>,
@@ -40,6 +41,22 @@ impl<T> List<T> {
     pub fn peek_mut(&mut self) -> Option<&mut T> {
         self.head.as_mut().map(|node| &mut node.elem)
     }
+
+    pub fn into_iter(self) -> IntoIter<T> {
+        IntoIter(self)
+    }
+
+    pub fn iter(&self) -> Iter<'_, T> {
+        Iter {
+            next: self.head.as_deref(),
+        }
+    }
+
+    pub fn iter_mut(&mut self) -> IterMut<'_, T> {
+        IterMut {
+            next: self.head.as_deref_mut(),
+        }
+    }
 }
 
 impl<T> Drop for List<T> {
@@ -52,20 +69,9 @@ impl<T> Drop for List<T> {
     }
 }
 
-pub struct ListIntoIter<T>(List<T>);
+pub struct IntoIter<T>(List<T>);
 
-// This implementation isn't actually part of 3.4 IntoIter but Clippy prompted me to implement
-// the standard IntoIterator trait rather than just tack into_iter onto List's implementation.
-impl<T> IntoIterator for List<T> {
-    type Item = T;
-    type IntoIter = ListIntoIter<T>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        ListIntoIter(self)
-    }
-}
-
-impl<T> Iterator for ListIntoIter<T> {
+impl<T> Iterator for IntoIter<T> {
     type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -73,25 +79,32 @@ impl<T> Iterator for ListIntoIter<T> {
     }
 }
 
-pub struct ListIter<'a, T> {
+pub struct Iter<'a, T> {
     next: Option<&'a Node<T>>,
 }
 
-impl<T> List<T> {
-    pub fn iter(&self) -> ListIter<'_, T> {
-        ListIter {
-            next: self.head.as_deref(),
-        }
-    }
-}
-
-impl<'a, T> Iterator for ListIter<'a, T> {
+impl<'a, T> Iterator for Iter<'a, T> {
     type Item = &'a T;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.next.map(|node| {
             self.next = node.next.as_deref();
             &node.elem
+        })
+    }
+}
+
+pub struct IterMut<'a, T> {
+    next: Option<&'a mut Node<T>>,
+}
+
+impl<'a, T> Iterator for IterMut<'a, T> {
+    type Item = &'a mut T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next.take().map(|node| {
+            self.next = node.next.as_deref_mut();
+            &mut node.elem
         })
     }
 }
@@ -173,5 +186,48 @@ mod test {
         assert_eq!(iter.next(), Some(&3));
         assert_eq!(iter.next(), Some(&2));
         assert_eq!(iter.next(), Some(&1));
+    }
+
+    #[test]
+    fn iter_mut() {
+        let mut list = List::new();
+        list.push(1);
+        list.push(2);
+        list.push(3);
+
+        let mut iter = list.iter_mut();
+        assert_eq!(iter.next(), Some(&mut 3));
+        assert_eq!(iter.next(), Some(&mut 2));
+        assert_eq!(iter.next(), Some(&mut 1));
+    }
+
+    #[test]
+    fn iter_mut_extended() {
+        struct Person {
+            name: String,
+            age: u32,
+        }
+        let mut list = List::new();
+        list.push(Person {
+            name: String::from("Ashlin"),
+            age: 38,
+        });
+        list.push(Person {
+            name: String::from("Emma"),
+            age: 40,
+        });
+        list.push(Person {
+            name: String::from("Isa"),
+            age: 5,
+        });
+
+        let iter = list.iter_mut();
+        for person in iter {
+            person.age += 1;
+        }
+
+        assert_eq!(list.pop().map(|p| p.age), Some(6));
+        assert_eq!(list.pop().map(|p| p.age), Some(41));
+        assert_eq!(list.pop().map(|p| p.age), Some(39));
     }
 }
